@@ -26,10 +26,7 @@ Before you begin, ensure you have the following installed:
 
 1. Create a new project in [Appwrite Console](https://cloud.appwrite.io)
 2. Create a new database
-3. Create a collection with the following schema:
-   ```
-   content (string, required)
-   ```
+3. Create a new collection
 4. Enable Document Security in the collection settings
 5. Create an API key with the following permissions:
    - databases.collections.read
@@ -40,10 +37,12 @@ Before you begin, ensure you have the following installed:
    - users.write
 
 6. Note down the following values:
-   - Project ID
-   - API Key
-   - Database ID
-   - Collection ID
+   - Project ID (Found in Project Settings > General)
+   - API Key (The one you just created)
+   - Database ID (Found in Databases > Your Database)
+   - Collection ID (Found in Databases > Your Database > Collections)
+
+Note: The application will automatically create any required attributes in the collection when it first starts up.
 
 ## Security Model
 

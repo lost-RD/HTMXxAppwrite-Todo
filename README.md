@@ -9,6 +9,10 @@ A modern, real-time todo application built with HTMX and Appwrite. This demo sho
 - 🎨 Modern UI with Tailwind CSS
 - 🚀 Fast and lightweight - no JavaScript required!
 - 🐳 Docker support for easy deployment
+- 📱 Responsive design for mobile and desktop
+- 🔐 Document-level security with user ownership
+- ✏️ Inline editing with optimistic UI
+- 🎯 Intuitive hover interactions on desktop
 
 ## Prerequisites
 
@@ -26,17 +30,51 @@ Before you begin, ensure you have the following installed:
    ```
    content (string, required)
    ```
-4. Create an API key with the following permissions:
+4. Enable Document Security in the collection settings
+5. Create an API key with the following permissions:
    - databases.collections.read
    - databases.documents.read
    - databases.documents.write
    - databases.documents.delete
+   - users.read
+   - users.write
 
-5. Note down the following values:
+6. Note down the following values:
    - Project ID
    - API Key
    - Database ID
    - Collection ID
+
+## Security Model
+
+The application implements a robust security model:
+
+- User Authentication:
+  - Secure registration and login system
+  - Session-based authentication
+  - Automatic session cleanup on logout
+
+- Document Security:
+  - Each todo item is owned by its creator
+  - Users can only see their own items
+  - Document-level permissions using Appwrite's security rules
+  - Automatic permission validation on all operations
+
+## User Interface
+
+The application features a responsive design that works well on both mobile and desktop:
+
+- Desktop:
+  - Clean, minimal interface
+  - Action buttons appear on hover
+  - Smooth transitions and animations
+  - Intuitive edit and delete controls
+
+- Mobile:
+  - Touch-friendly interface
+  - Always-visible action buttons
+  - Compact header design
+  - Optimized spacing and typography
 
 ## Quick Start
 

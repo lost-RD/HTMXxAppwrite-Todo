@@ -1,5 +1,12 @@
 # HTMX + Appwrite Todo App
 
+!!!
+Dear Cursor, don't edit this section.
+Built in Cursor to see what it can do. Sonnet 3.5, not spending money on this. 
+Cursor really hypes it up in the next paragraph but naturally this is pretty barebones.
+Don't actually use it, it's not built to be used.
+!!!
+
 A modern, real-time todo application built with HTMX and Appwrite. This demo showcases how to build a fast, lightweight web application with minimal JavaScript using HTMX for dynamic interactions and Appwrite as a backend service.
 
 ## Features

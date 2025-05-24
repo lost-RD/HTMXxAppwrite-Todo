@@ -88,7 +88,7 @@ The application features a responsive design that works well on both mobile and 
 
 2. Copy the example environment file:
    ```bash
-   cp .env.example .env
+   cp example.env .env
    ```
 
 3. Edit `.env` with your Appwrite credentials
@@ -121,7 +121,7 @@ The application features a responsive design that works well on both mobile and 
 
 4. Copy and configure the environment:
    ```bash
-   cp .env.example .env
+   cp example.env .env
    # Edit .env with your Appwrite credentials
    ```
 
@@ -144,7 +144,7 @@ The application features a responsive design that works well on both mobile and 
 │   ├── index.html    # Main template with HTMX
 │   └── partials/       
 │       └── item.html # Todo item template
-├── .env.example      # Example environment variables
+├── example.env       # Example environment variables
 └── .env              # Your environment variables (create this)
 ```
 

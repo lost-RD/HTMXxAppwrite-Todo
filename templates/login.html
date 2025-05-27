@@ -41,7 +41,13 @@
             </button>
         </form>
 
-        <div class="mt-4 text-center">
+        <div class="mt-4 flex flex-col space-y-4 text-center">
+            <div>
+                <a href="{{ url_for('guest_login') }}" 
+                   class="w-full inline-block py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                    Continue as Guest
+                </a>
+            </div>
             <p class="text-sm text-gray-600">
                 Don't have an account? 
                 <a href="{{ url_for('register') }}" class="font-medium text-blue-600 hover:text-blue-500">

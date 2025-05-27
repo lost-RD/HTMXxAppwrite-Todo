@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, make_response, g
 from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.services.account import Account
@@ -15,16 +15,6 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
-# Protect routes that require authentication
-def login_required(f):
-    """Decorator to require login for routes."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -32,27 +22,60 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Appwrite client
-client = Client()
-client.set_endpoint(os.getenv('APPWRITE_ENDPOINT', 'https://cloud.appwrite.io/v1'))
-client.set_project(os.getenv('APPWRITE_PROJECT_ID'))
-client.set_key(os.getenv('APPWRITE_API_KEY'))
-
-# Initialize Appwrite services
-databases = Databases(client)
-account = Account(client)
-
 # Configure Flask session
-app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # Get database configuration
 database_id = os.getenv('DATABASE_ID')
 collection_id = os.getenv('COLLECTION_ID')
 
+# Protect routes that require authentication
+def login_required(f):
+    """Decorator to require login for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+            
+        # Get session secret from cookie
+        session_secret = request.cookies.get('appwrite_session')
+        if not session_secret:
+            session.clear()
+            return redirect(url_for('login'))
+            
+        # Set session for client
+        client = get_client()
+        client.set_session(session_secret)
+        
+        # Store client in g object for route to use
+        g.client = client
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_client():
+    client = Client()
+    client.set_endpoint(os.getenv('APPWRITE_ENDPOINT'))
+    client.set_project(os.getenv('APPWRITE_PROJECT_ID'))
+    return client
+
+def get_user_client():
+    client = get_client()
+    session_secret = request.cookies.get('appwrite_session')
+    if session_secret:
+        client.set_session(session_secret)
+    return client
+
+def get_admin_client():
+    client = get_client()
+    client.set_key(os.getenv('APPWRITE_API_KEY'))
+    return client
+
 @cache
 def ensure_collection_attributes():
     """Ensure required attributes exist in the collection. This function is cached and will only run once."""
     try:
+        databases = Databases(get_admin_client())
+
         # List attributes to check if they exist
         attributes = databases.list_attributes(
             database_id=database_id,
@@ -85,8 +108,8 @@ def ensure_collection_attributes():
 def index():
     """Render the main page with all todo items."""
     try:
-        # With document security enabled, list_documents will automatically only return
-        # documents the user has permission to access
+        # Use the authenticated client from the decorator
+        databases = Databases(g.client)
         items = databases.list_documents(
             database_id=database_id,
             collection_id=collection_id
@@ -107,9 +130,9 @@ def add_item():
         if not content:
             return "Content is required", 400
 
-        # Create document in Appwrite
-        # With document security enabled, the document will automatically be owned by the current user
+        # Create document in Appwrite using admin client to bypass permissions
         document_id = ID.unique()
+        databases = Databases(get_admin_client())
         item = databases.create_document(
             database_id=database_id,
             collection_id=collection_id,
@@ -142,6 +165,7 @@ def delete_item(item_id):
     try:
         # With document security enabled, delete_document will fail automatically
         # if the user doesn't have permission to delete the document
+        databases = Databases(get_user_client())
         databases.delete_document(
             database_id=database_id,
             collection_id=collection_id,
@@ -165,6 +189,7 @@ def update_item(item_id):
 
         # Update document in Appwrite
         # Document security will automatically check if user has permission
+        databases = Databases(get_user_client())
         item = databases.update_document(
             database_id=database_id,
             collection_id=collection_id,
@@ -190,28 +215,25 @@ def update_item(item_id):
 def register():
     """Handle user registration."""
     if request.method == 'POST':
-        try:
-            email = request.form.get('email')
-            password = request.form.get('password')
-            name = request.form.get('name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        name = request.form.get('name')
 
-            # Create user account
-            user = account.create(
-                user_id=ID.unique(),
-                email=email,
-                password=password,
-                name=name
-            )
+        # Create user account
+        account = Account(get_client())
+        user = account.create(
+            user_id=ID.unique(),
+            email=email,
+            password=password,
+            name=name
+        )
 
-            # Create session for the new user
-            session_data = account.create_email_password_session(email, password)
-            session['user_id'] = user['$id']
-            session['user_name'] = name
-            
-            return redirect(url_for('index'))
-        except AppwriteException as e:
-            logger.error(f"Registration failed: {str(e)}")
-            return render_template('register.html', error=str(e))
+        # Create session for the new user
+        session_data = account.create_email_password_session(email, password)
+        session['user_id'] = user['$id']
+        session['user_name'] = name
+        
+        return redirect(url_for('index'))
     
     return render_template('register.html')
 
@@ -219,36 +241,96 @@ def register():
 def login():
     """Handle user login."""
     if request.method == 'POST':
-        try:
-            email = request.form.get('email')
-            password = request.form.get('password')
+        email = request.form.get('email')
+        password = request.form.get('password')
 
-            # Create session
-            session_data = account.create_email_password_session(email, password)
-            session['user_id'] = session_data['userId']
-            
-            # Get user data and store name in session
-            user = account.get()
-            session['user_name'] = user['name']
-            
-            return redirect(url_for('index'))
-        except AppwriteException as e:
-            logger.error(f"Login failed: {str(e)}")
-            return render_template('login.html', error=str(e))
+        # Create session using admin client
+        account = Account(get_admin_client())
+        session_data = account.create_email_password_session(email, password)
+        
+        # Create response with redirect
+        response = make_response(redirect(url_for('index')))
+        
+        # Set secure cookie with session secret
+        response.set_cookie(
+            'appwrite_session',
+            session_data['secret'],
+            httponly=True,
+            secure=True,
+            samesite='Lax',
+            expires=session_data['expire']
+        )
+        
+        # Create new client with session and get account details
+        client = get_client()
+        client.set_session(session_data['secret'])
+        account = Account(client)
+        account_data = account.get()
+        
+        # Store user info in Flask session
+        session['user_id'] = session_data['userId']
+        session['user_name'] = account_data['name']
+        
+        return response
     
     return render_template('login.html')
+
+@app.route('/guest-login')
+def guest_login():
+    """Handle guest login by creating an anonymous session."""
+    try:
+        # Create anonymous session using admin client
+        account = Account(get_admin_client())
+        session_data = account.create_anonymous_session()
+        
+        # Create response with redirect
+        response = make_response(redirect(url_for('index')))
+        
+        # Set secure cookie with session secret
+        response.set_cookie(
+            'appwrite_session',
+            session_data['secret'],
+            httponly=True,
+            secure=True,
+            samesite='Lax',
+            expires=session_data['expire']
+        )
+        
+        # Store user info in Flask session
+        session['user_id'] = session_data['userId']
+        session['user_name'] = 'Guest'
+        
+        return response
+    except AppwriteException as e:
+        logger.error(f"Failed to create guest session: {str(e)}")
+        return redirect(url_for('login'))
 
 @app.route('/logout')
 def logout():
     """Handle user logout."""
     try:
         if 'user_id' in session:
-            # Delete the current session
-            account.delete_session('current')
-            session.clear()  # Clear all session data
+            # Get the session secret from cookie
+            session_secret = request.cookies.get('appwrite_session')
+            if session_secret:
+                # Create client with session
+                client = get_client()
+                client.set_session(session_secret)
+                account = Account(client)
+                
+                # Delete the current session
+                account.delete_session('current')
+                
+                # Create response and clear cookies
+                response = make_response(redirect(url_for('login')))
+                response.delete_cookie('appwrite_session')
+                session.clear()
+                return response
     except AppwriteException as e:
-        logger.error(f"Logout failed: {str(e)}")
+        logger.error(f"Error during logout: {str(e)}")
     
+    # If anything fails, still clear local session and redirect
+    session.clear()
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
